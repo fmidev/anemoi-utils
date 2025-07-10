@@ -1,0 +1,54 @@
+name: Sync main with upstream
+
+on:
+  schedule:
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout fork's main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/ORIGINAL_OWNER/ORIGINAL_REPO.git
+
+      - name: Fetch upstream
+        run: git fetch upstream
+
+      - name: Stash .github directory
+        run: |
+          if [ -d .github ]; then
+            mv .github ../.github-backup
+          fi
+
+      - name: Merge upstream/main
+        run: git merge upstream/main --no-commit
+
+      - name: Restore .github directory
+        run: |
+          if [ -d ../.github-backup ]; then
+            rm -rf .github
+            mv ../.github-backup .github
+          fi
+
+      - name: Commit merge (if needed)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet; then
+            git add .
+            git commit -m "Merge upstream/main, preserve .github directory"
+            git push origin main
+          else
+            echo "No changes to commit."
+          fi
